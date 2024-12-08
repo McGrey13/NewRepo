@@ -71,9 +71,9 @@
             this.passwordtxt.Location = new System.Drawing.Point(368, 198);
             this.passwordtxt.Margin = new System.Windows.Forms.Padding(2);
             this.passwordtxt.Name = "passwordtxt";
-            this.passwordtxt.PasswordChar = '●';
             this.passwordtxt.Size = new System.Drawing.Size(191, 23);
             this.passwordtxt.TabIndex = 22;
+            this.passwordtxt.UseSystemPasswordChar = true;
             this.passwordtxt.TextChanged += new System.EventHandler(this.passwordtxt_TextChanged);
             // 
             // usernametxt

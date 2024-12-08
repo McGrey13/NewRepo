@@ -18,7 +18,6 @@ namespace COMPANY
         {
             //Initializes a new instance of the LOGIN form.
             InitializeComponent();
-            showPass.CheckedChanged += showPass_CheckedChanged;
         }
 
         private void LOGIN_Load(object sender, EventArgs e)
@@ -112,17 +111,7 @@ namespace COMPANY
         //Toggles the visibility of the password text in the password field.
         private void showPass_CheckedChanged(object sender, EventArgs e)
         {
-            // Toggle the UseSystemPasswordChar property based on the checkbox state
-            if (showPass.Checked)
-            {
-                // Show the password as plain text
-                passwordtxt.UseSystemPasswordChar = false;
-            }
-            else
-            {
-                // Hide the password with the system password character
-                passwordtxt.UseSystemPasswordChar = true;
-            }
+            passwordtxt.UseSystemPasswordChar = !showPass.Checked;
         }
     }
 }

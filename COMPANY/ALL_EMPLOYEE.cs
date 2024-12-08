@@ -35,26 +35,32 @@ namespace COMPANY
             try
             {
                 if (connection.State == ConnectionState.Open)
-                {
                     connection.Close();
-                }
 
                 connection.Open();
                 string query = @"
-        SELECT e.EmployeeID, e.FirstName, e.LastName, 
-               d.DepartmentName, p.ProjectName, t.TaskName
-        FROM Employee e
-        LEFT JOIN Department d ON e.DepartmentID = d.DepartmentID
-        LEFT JOIN Task t ON t.AssignedTo = e.EmployeeID
-        LEFT JOIN Project p ON t.ProjectID = p.ProjectID
-        ORDER BY e.EmployeeID;";
+             SELECT 
+                e.EmployeeID, 
+                e.FirstName, 
+                e.LastName, 
+                d.DepartmentName, 
+                t.TaskName, 
+                p.ProjectName 
+            FROM 
+                Employee e
+            LEFT JOIN 
+                Department d ON e.DepartmentID = d.DepartmentID
+            LEFT JOIN 
+                Task t ON e.EmployeeID = t.AssignedTo
+            LEFT JOIN 
+                Project p ON t.ProjectID = p.ProjectID";
 
-                MySqlCommand command = new MySqlCommand(query, connection);
-                MySqlDataAdapter adapter = new MySqlDataAdapter(command);
+                MySqlDataAdapter adapter = new MySqlDataAdapter(query, connection);
                 DataTable dataTable = new DataTable();
                 adapter.Fill(dataTable);
-                dataGridView1.DataSource = dataTable; // Refresh DataGridView
-                FormatDataGridView(); // Ensure headers are formatted
+
+                dataGridView1.DataSource = dataTable;
+                FormatDataGridView();
             }
             catch (Exception ex)
             {
@@ -62,7 +68,8 @@ namespace COMPANY
             }
             finally
             {
-                connection.Close();
+                if (connection.State == ConnectionState.Open)
+                    connection.Close();
             }
         }
 
@@ -129,7 +136,7 @@ namespace COMPANY
                     connection.Close(); 
 
                 connection.Open();
-                string query = "SELECT TaskID, TaskName FROM Task";
+                string query = "SELECT TaskID, TaskName                                                                                                                                                                                                  FROM Task";
                 MySqlDataAdapter adapter = new MySqlDataAdapter(query, connection);
                 DataTable dataTable = new DataTable();
                 adapter.Fill(dataTable);
@@ -150,101 +157,54 @@ namespace COMPANY
 
         private void addEmp_Click(object sender, EventArgs e)
         {
-            if (!ValidateInputs())
+            // Validate input fields before adding
+            if (string.IsNullOrWhiteSpace(empIdtxt.Text) || string.IsNullOrWhiteSpace(fntxt.Text) ||
+                string.IsNullOrWhiteSpace(lntxt.Text) || deptBox.SelectedValue == null ||
+                projectBox.SelectedValue == null || taskBox.SelectedValue == null)
             {
+                MessageBox.Show("All fields must be filled to add an employee, including Department, Project, and Task.",
+                                "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            string firstName = fntxt.Text;
-            string lastName = lntxt.Text;
-            string departmentName = deptBox.Text;
+            if (!int.TryParse(empIdtxt.Text, out int employeeId))
+            {
+                MessageBox.Show("Employee ID must be a valid number.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int departmentId = Convert.ToInt32(deptBox.SelectedValue);
+            int projectId = Convert.ToInt32(projectBox.SelectedValue);
+            int taskId = Convert.ToInt32(taskBox.SelectedValue);
 
             try
             {
                 connection.Open();
-
-                // Insert into Department table if it doesn't exist
-                string insertDepartmentQuery = @"
-            INSERT IGNORE INTO Department (DepartmentName)
-            VALUES (@DepartmentName)";
-
-                using (MySqlCommand insertDepartmentCommand = new MySqlCommand(insertDepartmentQuery, connection))
-                {
-                    insertDepartmentCommand.Parameters.AddWithValue("@DepartmentName", departmentName);
-                    insertDepartmentCommand.ExecuteNonQuery();
-                }
-
-                // Get DepartmentID
-                int departmentID = GetDepartmentID(departmentName);
-
-                // Insert into Employee table
-                string insertEmployeeQuery = @"
-            INSERT INTO Employee (FirstName, LastName, DepartmentID)
-            VALUES (@FirstName, @LastName, @DepartmentID)";
-
-                using (MySqlCommand insertEmployeeCommand = new MySqlCommand(insertEmployeeQuery, connection))
-                {
-                    insertEmployeeCommand.Parameters.AddWithValue("@FirstName", firstName);
-                    insertEmployeeCommand.Parameters.AddWithValue("@LastName", lastName);
-                    insertEmployeeCommand.Parameters.AddWithValue("@DepartmentID", departmentID);
-                    insertEmployeeCommand.ExecuteNonQuery();
-                }
-
-                // Get the auto-generated EmployeeID
-                int employeeID = GetLastInsertedEmployeeID();
-
-                // Insert into Project table if it doesn't exist
-                string projectName = projectBox.Text;
-                string insertProjectQuery = @"
-            INSERT IGNORE INTO Project (ProjectName, StartDate)
-            VALUES (@ProjectName, CURRENT_DATE())";
-
-                using (MySqlCommand insertProjectCommand = new MySqlCommand(insertProjectQuery, connection))
-                {
-                    insertProjectCommand.Parameters.AddWithValue("@ProjectName", projectName);
-                    insertProjectCommand.ExecuteNonQuery();
-                }
-
-                // Get ProjectID
-                int projectID = GetProjectID(projectName);
-
-                // Insert into Task table if it doesn't exist
-                string taskName = taskBox.Text;
-                string insertTaskQuery = @"
-            INSERT IGNORE INTO Task (TaskName, ProjectID)
-            VALUES (@TaskName, @ProjectID)";
-
-                using (MySqlCommand insertTaskCommand = new MySqlCommand(insertTaskQuery, connection))
-                {
-                    insertTaskCommand.Parameters.AddWithValue("@TaskName", taskName);
-                    insertTaskCommand.Parameters.AddWithValue("@ProjectID", projectID);
-                    insertTaskCommand.ExecuteNonQuery();
-                }
-
-                // Get TaskID
-                int taskID = GetTaskID(taskName);
-
-                // Update Task with AssignedTo
-                string updateTaskQuery = @"
+                string query = @"
+            INSERT INTO Employee (EmployeeID, FirstName, LastName, DepartmentID) 
+            VALUES (@EmployeeID, @FirstName, @LastName, @DepartmentID);
+            
             UPDATE Task 
-            SET AssignedTo = @EmployeeID
+            SET AssignedTo = @EmployeeID 
             WHERE TaskID = @TaskID";
 
-                using (MySqlCommand updateTaskCommand = new MySqlCommand(updateTaskQuery, connection))
-                {
-                    updateTaskCommand.Parameters.AddWithValue("@EmployeeID", employeeID);
-                    updateTaskCommand.Parameters.AddWithValue("@TaskID", taskID);
-                    updateTaskCommand.ExecuteNonQuery();
-                }
+                MySqlCommand command = new MySqlCommand(query, connection);
 
-                MessageBox.Show("Employee and Task added successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                command.Parameters.AddWithValue("@FirstName", fntxt.Text);
+                command.Parameters.AddWithValue("@LastName", lntxt.Text);
+                command.Parameters.AddWithValue("@DepartmentID", departmentId);
+                command.Parameters.AddWithValue("@TaskID", taskId);
+
+                command.ExecuteNonQuery();
+                MessageBox.Show("Employee added successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                 LoadEmployees(); // Refresh the DataGridView
                 ClearInputFields();
-
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error adding employee and task: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error adding employee: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -252,59 +212,6 @@ namespace COMPANY
             }
         }
 
-        private int GetDepartmentID(string departmentName)
-{
-    string getDepartmentIDQuery = @"
-        SELECT DepartmentID 
-        FROM Department 
-        WHERE DepartmentName = @DepartmentName";
-
-    using (MySqlCommand command = new MySqlCommand(getDepartmentIDQuery, connection))
-    {
-        command.Parameters.AddWithValue("@DepartmentName", departmentName);
-        object result = command.ExecuteScalar();
-        return result == DBNull.Value ? -1 : Convert.ToInt32(result);
-    }
-}
-
-private int GetProjectID(string projectName)
-{
-    string getProjectIDQuery = @"
-        SELECT ProjectID 
-        FROM Project 
-        WHERE ProjectName = @ProjectName";
-
-    using (MySqlCommand command = new MySqlCommand(getProjectIDQuery, connection))
-    {
-        command.Parameters.AddWithValue("@ProjectName", projectName);
-        object result = command.ExecuteScalar();
-        return result == DBNull.Value ? -1 : Convert.ToInt32(result);
-    }
-}
-
-private int GetTaskID(string taskName)
-{
-    string getTaskIDQuery = @"
-        SELECT TaskID 
-        FROM Task 
-        WHERE TaskName = @TaskName";
-
-    using (MySqlCommand command = new MySqlCommand(getTaskIDQuery, connection))
-    {
-        command.Parameters.AddWithValue("@TaskName", taskName);
-        object result = command.ExecuteScalar();
-        return result == DBNull.Value ? -1 : Convert.ToInt32(result);
-    }
-}
-
-private int GetLastInsertedEmployeeID()
-{
-    string getLastIDQuery = "SELECT LAST_INSERT_ID();";
-    using (MySqlCommand command = new MySqlCommand(getLastIDQuery, connection))
-    {
-        return Convert.ToInt32(command.ExecuteScalar());
-    }
-}
         private void empIdtxt_TextChanged(object sender, EventArgs e)
         {
 
@@ -382,59 +289,79 @@ private int GetLastInsertedEmployeeID()
         }
 
         private void updateEmp_Click(object sender, EventArgs e)
-            {
-            // Check if an employee is selected in the DataGridView
-            if (dataGridView1.SelectedRows.Count == 0)
-            {
-                MessageBox.Show("Please select an employee to update.", "Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // Get the selected employee ID from the DataGridView
-            var selectedRow = dataGridView1.SelectedRows[0];
-            int employeeId = Convert.ToInt32(selectedRow.Cells["EmployeeID"].Value);
-
-            // Validate input fields
-            if (string.IsNullOrWhiteSpace(fntxt.Text) ||
-                string.IsNullOrWhiteSpace(lntxt.Text) ||
-                deptBox.SelectedValue == null)
-            {
-                MessageBox.Show("All fields must be filled to update the employee.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            int departmentId = Convert.ToInt32(deptBox.SelectedValue);
-
+        {
             try
             {
-                connection.Open();
-
-                // Update employee data
-                string updateEmployeeQuery = @"
-            UPDATE Employee 
-            SET FirstName = @FirstName, LastName = @LastName, DepartmentID = @DepartmentID 
-            WHERE EmployeeID = @EmployeeID";
-
-                using (MySqlCommand updateCommand = new MySqlCommand(updateEmployeeQuery, connection))
+                string connectionString = "server=localhost;port=3306;database=ManagementData;uid=root;pwd=;";
+                using (MySqlConnection connection = new MySqlConnection(connectionString))
                 {
-                    updateCommand.Parameters.AddWithValue("@EmployeeID", employeeId);
-                    updateCommand.Parameters.AddWithValue("@FirstName", fntxt.Text.Trim());
-                    updateCommand.Parameters.AddWithValue("@LastName", lntxt.Text.Trim());
-                    updateCommand.Parameters.AddWithValue("@DepartmentID", departmentId);
-                    updateCommand.ExecuteNonQuery();
-                }
+                    connection.Open();
 
-                MessageBox.Show("Employee updated successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LoadEmployees(); // Refresh the DataGridView
-                ClearInputFields(); // Clear input fields after updating
+                    // Check if an employee is selected
+                    if (dataGridView1.SelectedRows.Count == 0)
+                    {
+                        MessageBox.Show("Please select an employee from the table to update.", "Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Get the selected EmployeeID
+                    int employeeId = Convert.ToInt32(dataGridView1.SelectedRows[0].Cells["EmployeeID"].Value);
+
+                    // Ensure all fields are filled
+                    if (string.IsNullOrWhiteSpace(fntxt.Text) || string.IsNullOrWhiteSpace(lntxt.Text) || deptBox.SelectedValue == null)
+                    {
+                        MessageBox.Show("First Name, Last Name, and Department must be filled.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Convert SelectedValue to int safely
+                    if (!int.TryParse(deptBox.SelectedValue.ToString(), out int departmentId))
+                    {
+                        MessageBox.Show("Invalid Department ID.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Begin a transaction for atomicity
+                    using (MySqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // Update Employee details
+                            string updateEmployeeQuery = "UPDATE Employee SET FirstName = @FirstName, LastName = @LastName, DepartmentID = @DepartmentID WHERE EmployeeID = @EmployeeID";
+                            using (MySqlCommand updateEmployeeCmd = new MySqlCommand(updateEmployeeQuery, connection, transaction))
+                            {
+                                updateEmployeeCmd.Parameters.AddWithValue("@FirstName", fntxt.Text.Trim());
+                                updateEmployeeCmd.Parameters.AddWithValue("@LastName", lntxt.Text.Trim());
+                                updateEmployeeCmd.Parameters.AddWithValue("@DepartmentID", departmentId);
+                                updateEmployeeCmd.Parameters.AddWithValue("@EmployeeID", employeeId);
+
+                                int rowsAffected = updateEmployeeCmd.ExecuteNonQuery();
+                                if (rowsAffected == 0)
+                                {
+                                    MessageBox.Show("No employee was updated. Check if the EmployeeID exists.", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                }
+                                else
+                                {
+                                    MessageBox.Show($"{rowsAffected} employee(s) updated successfully.", "Update Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                }
+                            }
+
+                            // Commit the transaction
+                            transaction.Commit();
+                            LoadEmployees();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Rollback the transaction in case of an error
+                            transaction.Rollback();
+                            MessageBox.Show($"An error occurred while updating: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating employee: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                connection.Close();
+                MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -507,27 +434,20 @@ private int GetLastInsertedEmployeeID()
 
         private bool ValidateInputs()
         {
-            if (string.IsNullOrWhiteSpace(fntxt.Text) ||
-                string.IsNullOrWhiteSpace(lntxt.Text) ||
-                deptBox.SelectedIndex == -1)
+            if (string.IsNullOrWhiteSpace(empIdtxt.Text) || string.IsNullOrWhiteSpace(fntxt.Text) ||
+                string.IsNullOrWhiteSpace(lntxt.Text) || string.IsNullOrWhiteSpace(deptBox.Text))
             {
                 MessageBox.Show("All fields must be filled to proceed.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (!int.TryParse(empIdtxt.Text, out int employeeID))
+            if (!int.TryParse(empIdtxt.Text, out _) || !int.TryParse(deptBox.Text, out _))
             {
-                MessageBox.Show("Employee ID must be a valid number.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Employee ID and Department ID must be valid numbers.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (deptBox.SelectedValue == null)
-            {
-                MessageBox.Show("Please select a Department.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            return true;
+            return true;                                                                                                                            
         }
 
         private void FormatDataGridView()
@@ -535,6 +455,7 @@ private int GetLastInsertedEmployeeID()
             try
             {
                 dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                // ... (other DataGridView settings) ...
 
                 if (dataGridView1.Columns.Contains("ProjectName"))
                 {
@@ -546,6 +467,7 @@ private int GetLastInsertedEmployeeID()
                     dataGridView1.Columns["TaskName"].HeaderText = "Task Name";
                 }
 
+                // Check for and set headers for other columns if needed
                 if (dataGridView1.Columns.Contains("DepartmentName"))
                 {
                     dataGridView1.Columns["DepartmentName"].HeaderText = "Department";
@@ -565,14 +487,16 @@ private int GetLastInsertedEmployeeID()
                 {
                     dataGridView1.Columns["LastName"].HeaderText = "Last Name";
                 }
+
             }
             catch (NullReferenceException ex)
             {
                 MessageBox.Show($"Error accessing DataGridView column: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Log the error for further investigation (optional)
+                // Example: 
+                // Console.WriteLine($"Error: {ex.Message}");
             }
-
         }
-       
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
             dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
@@ -582,7 +506,29 @@ private int GetLastInsertedEmployeeID()
 
         private void dataGridView1_CellContentClick_1(object sender, DataGridViewCellEventArgs e)
         {
-          
+            FormatDataGridView();
+            LoadEmployees();
+
+            // Ensure the clicked cell is not a header
+            if (e.RowIndex >= 0)
+            {
+                // Get the clicked row
+                var selectedRow = dataGridView1.Rows[e.RowIndex];
+
+                // Select the row and highlight it
+                selectedRow.Selected = true;
+
+                // Store the EmployeeID for further actions
+                int employeeID = Convert.ToInt32(selectedRow.Cells["EmployeeID"].Value);
+                string firstName = selectedRow.Cells["FirstName"].Value.ToString();
+                string lastName = selectedRow.Cells["LastName"].Value.ToString();
+
+                // You can store these in class-level variables if needed
+                // selectedEmployeeID = employeeID;
+
+                // Display the selected Employee ID and Name for debugging
+                MessageBox.Show($"Selected Employee ID: {employeeID}, Name: {firstName} {lastName}", "Selected Employee", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
     
     }
