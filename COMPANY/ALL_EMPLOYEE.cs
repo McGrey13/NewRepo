@@ -136,7 +136,7 @@ namespace COMPANY
                     connection.Close(); 
 
                 connection.Open();
-                string query = "SELECT TaskID, TaskName, FROM Task";
+                string query = "SELECT TaskID, TaskName FROM Task";
                 MySqlDataAdapter adapter = new MySqlDataAdapter(query, connection);
                 DataTable dataTable = new DataTable();
                 adapter.Fill(dataTable);
